@@ -46,7 +46,7 @@ services:
     networks:
       - app_network
 
-# Подключаемся к внешней сети
+# Подключаемся к существующей сети events
 networks:
   app_network:
     external: true 
