@@ -1,12 +1,21 @@
 import os
 import tempfile
+import logging
 from datetime import datetime
 from typing import Optional
-from weasyprint import HTML, CSS
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from jinja2 import Environment, FileSystemLoader
 from ..schemas.configuration import ConfigurationExport
 from ..config import settings
 
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 class PDFService:
     """Сервис для генерации PDF отчетов"""
@@ -19,19 +28,45 @@ class PDFService:
     def generate_configuration_pdf(self, export_data: ConfigurationExport) -> str:
         """Генерация PDF отчета конфигурации"""
         
-        # Создаем временный файл для PDF (пока что HTML)
-        pdf_filename = f"config_{export_data.configuration.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+        logger.info(f"Начинаю генерацию PDF для конфигурации {export_data.configuration.id}")
+        
+        # Создаем временный файл для PDF
+        pdf_filename = f"config_{export_data.configuration.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         pdf_path = os.path.join(settings.PDF_TEMP_PATH, pdf_filename)
         
-        # Генерируем простой HTML отчет
-        html_content = self._generate_simple_html_report(export_data)
-        
-        # Сохраняем в файл
+        # Создаем директорию если её нет
         os.makedirs(settings.PDF_TEMP_PATH, exist_ok=True)
-        with open(pdf_path, 'w', encoding='utf-8') as f:
-            f.write(html_content)
+        logger.info(f"Создана директория: {settings.PDF_TEMP_PATH}")
         
-        return pdf_path
+        try:
+            # Генерируем PDF с помощью reportlab
+            logger.info("Создаю PDF с помощью reportlab")
+            self._generate_pdf_with_reportlab(export_data, pdf_path)
+            
+            # Проверяем, что файл действительно создан
+            if os.path.exists(pdf_path):
+                file_size = os.path.getsize(pdf_path)
+                logger.info(f"PDF файл создан, размер: {file_size} байт")
+                return pdf_path
+            else:
+                raise Exception("PDF файл не был создан")
+            
+        except Exception as e:
+            # В случае ошибки генерируем простой HTML отчет как fallback
+            logger.error(f"Ошибка генерации PDF: {e}", exc_info=True)
+            
+            # Создаем HTML файл как резервный вариант
+            html_filename = f"config_{export_data.configuration.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+            html_path = os.path.join(settings.PDF_TEMP_PATH, html_filename)
+            
+            logger.info("Создаю HTML файл как резервный вариант")
+            html_content = self._generate_simple_html_report(export_data)
+            
+            with open(html_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            logger.info(f"HTML файл создан: {html_path}")
+            return html_path
     
     def _generate_simple_html_report(self, export_data: ConfigurationExport) -> str:
         """Генерация простого HTML отчета"""
@@ -183,232 +218,6 @@ class PDFService:
         }
         return status_map.get(status.lower(), "Неизвестно")
     
-    def _render_configuration_template(self, export_data: ConfigurationExport) -> str:
-        """Рендер HTML шаблона конфигурации"""
-        
-        template = self.jinja_env.get_template("configuration_pdf.html")
-        
-        # Подготавливаем данные для шаблона
-        config = export_data.configuration
-        compatibility = export_data.compatibility_check
-        
-        # Группируем компоненты по категориям
-        components_by_category = {}
-        total_price = 0.0
-        
-        for item in config.items:
-            category = item.component.category.name
-            if category not in components_by_category:
-                components_by_category[category] = []
-            
-            price = item.price_snapshot or item.component.price
-            total_price += price * item.quantity
-            
-            components_by_category[category].append({
-                "name": item.component.name,
-                "brand": item.component.brand,
-                "model": item.component.model,
-                "price": price,
-                "quantity": item.quantity,
-                "total": price * item.quantity,
-                "stock_status": self._get_stock_status_text(item.component.stock.status) if item.component.stock else "Неизвестно",
-                "specifications": self._format_specifications(item.component.specifications)
-            })
-        
-        # Форматируем проблемы совместимости
-        compatibility_issues = []
-        for issue in compatibility.issues:
-            compatibility_issues.append({
-                "type": self._get_issue_type_text(issue.type),
-                "severity": self._get_severity_text(issue.severity),
-                "message": issue.message,
-                "suggestions": issue.suggestions or []
-            })
-        
-        template_data = {
-            "config": config,
-            "components_by_category": components_by_category,
-            "total_price": total_price,
-            "compatibility_status": self._get_compatibility_status_text(compatibility.status),
-            "compatibility_issues": compatibility_issues,
-            "total_power": compatibility.total_power_consumption,
-            "recommended_psu": compatibility.recommended_psu_wattage,
-            "export_date": export_data.export_date.strftime("%d.%m.%Y %H:%M"),
-            "notes": export_data.notes
-        }
-        
-        return template.render(**template_data)
-    
-    def _get_pdf_styles(self) -> CSS:
-        """Получить CSS стили для PDF"""
-        
-        css_content = """
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        body {
-            font-family: 'Inter', sans-serif;
-            line-height: 1.6;
-            color: #333;
-            margin: 0;
-            padding: 20px;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #eee;
-            padding-bottom: 20px;
-        }
-        
-        .header h1 {
-            color: #2563eb;
-            margin: 0;
-            font-size: 24px;
-            font-weight: 700;
-        }
-        
-        .header p {
-            color: #666;
-            margin: 5px 0;
-        }
-        
-        .section {
-            margin-bottom: 25px;
-        }
-        
-        .section h2 {
-            color: #1f2937;
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 15px;
-            border-left: 4px solid #2563eb;
-            padding-left: 12px;
-        }
-        
-        .category {
-            margin-bottom: 20px;
-        }
-        
-        .category h3 {
-            color: #374151;
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-        
-        .component {
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 8px;
-        }
-        
-        .component-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        
-        .component-name {
-            font-weight: 600;
-            color: #1f2937;
-        }
-        
-        .component-price {
-            font-weight: 600;
-            color: #059669;
-        }
-        
-        .component-details {
-            font-size: 14px;
-            color: #6b7280;
-        }
-        
-        .compatibility-status {
-            padding: 8px 12px;
-            border-radius: 4px;
-            font-weight: 500;
-            display: inline-block;
-        }
-        
-        .compatible {
-            background-color: #d1fae5;
-            color: #065f46;
-        }
-        
-        .warning {
-            background-color: #fef3c7;
-            color: #92400e;
-        }
-        
-        .incompatible {
-            background-color: #fee2e2;
-            color: #991b1b;
-        }
-        
-        .issue {
-            background: #fef2f2;
-            border-left: 4px solid #f87171;
-            padding: 10px;
-            margin: 8px 0;
-        }
-        
-        .issue.warning {
-            background: #fffbeb;
-            border-left-color: #f59e0b;
-        }
-        
-        .summary-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-top: 20px;
-        }
-        
-        .summary-item {
-            text-align: center;
-        }
-        
-        .summary-value {
-            font-size: 20px;
-            font-weight: 700;
-            color: #2563eb;
-        }
-        
-        .summary-label {
-            font-size: 14px;
-            color: #6b7280;
-        }
-        
-        .footer {
-            margin-top: 40px;
-            text-align: center;
-            font-size: 12px;
-            color: #9ca3af;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-        }
-        
-        th, td {
-            padding: 8px;
-            text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        
-        th {
-            background-color: #f3f4f6;
-            font-weight: 600;
-        }
-        """
-        
-        return CSS(string=css_content)
-    
     def _get_stock_status_text(self, status: str) -> str:
         """Преобразовать статус наличия в текст"""
         status_map = {
@@ -451,4 +260,112 @@ class PDFService:
                 value = ", ".join(str(v) for v in value)
             formatted.append(f"{key}: {value}")
         
-        return " | ".join(formatted) 
+        return " | ".join(formatted)
+
+    def _generate_pdf_with_reportlab(self, export_data: ConfigurationExport, pdf_path: str):
+        """Генерация PDF с помощью reportlab"""
+        
+        config = export_data.configuration
+        compatibility = export_data.compatibility_check
+        
+        # Создаем документ
+        doc = SimpleDocTemplate(pdf_path, pagesize=A4)
+        story = []
+        
+        # Получаем стили
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            spaceAfter=30,
+            alignment=1  # Центрирование
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            spaceAfter=12,
+            textColor=colors.HexColor('#2563eb')
+        )
+        
+        # Заголовок
+        story.append(Paragraph("Конфигурация ПК", title_style))
+        story.append(Paragraph(f"<b>{config.name}</b>", styles['Normal']))
+        if config.description:
+            story.append(Paragraph(config.description, styles['Normal']))
+        story.append(Paragraph(f"Дата экспорта: {export_data.export_date.strftime('%d.%m.%Y %H:%M')}", styles['Normal']))
+        story.append(Spacer(1, 20))
+        
+        # Общая информация
+        total_price = sum((item.price_snapshot or item.component.price) * item.quantity for item in config.items)
+        
+        story.append(Paragraph("Общая информация", heading_style))
+        info_data = [
+            ['Общая стоимость:', f'{total_price:,.0f} руб.'],
+            ['Статус совместимости:', self._get_compatibility_status_text(compatibility.status)],
+        ]
+        
+        if compatibility.total_power_consumption:
+            info_data.append(['Энергопотребление:', f'{compatibility.total_power_consumption} Вт'])
+        if compatibility.recommended_psu_wattage:
+            info_data.append(['Рекомендуемая мощность БП:', f'{compatibility.recommended_psu_wattage} Вт'])
+        
+        info_table = Table(info_data, colWidths=[3*inch, 2*inch])
+        info_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(info_table)
+        story.append(Spacer(1, 20))
+        
+        # Компоненты
+        story.append(Paragraph("Компоненты", heading_style))
+        
+        # Группируем компоненты по категориям
+        components_by_category = {}
+        for item in config.items:
+            category = item.component.category.name
+            if category not in components_by_category:
+                components_by_category[category] = []
+            components_by_category[category].append(item)
+        
+        for category, items in components_by_category.items():
+            story.append(Paragraph(f"<b>{category}</b>", styles['Heading3']))
+            
+            for item in items:
+                price = item.price_snapshot or item.component.price
+                component_text = f"""
+                <b>{item.component.brand} {item.component.name}</b><br/>
+                Модель: {item.component.model}<br/>
+                Количество: {item.quantity}<br/>
+                Цена: {price:,.0f} руб.
+                """
+                story.append(Paragraph(component_text, styles['Normal']))
+                story.append(Spacer(1, 10))
+        
+        # Проблемы совместимости
+        if compatibility.issues:
+            story.append(Paragraph("Проблемы совместимости", heading_style))
+            for issue in compatibility.issues:
+                issue_text = f"""
+                <b>{self._get_issue_type_text(issue.type)} ({self._get_severity_text(issue.severity)})</b><br/>
+                {issue.message}
+                """
+                if issue.suggestions:
+                    issue_text += f"<br/>Рекомендации: {', '.join(issue.suggestions)}"
+                
+                story.append(Paragraph(issue_text, styles['Normal']))
+                story.append(Spacer(1, 10))
+        
+        # Футер
+        story.append(Spacer(1, 30))
+        story.append(Paragraph("Конфигурация создана с помощью веб-конфигуратора ПК", styles['Normal']))
+        if config.public_uuid:
+            story.append(Paragraph(f"UUID: {config.public_uuid}", styles['Normal']))
+        
+        # Генерируем PDF
+        doc.build(story) 

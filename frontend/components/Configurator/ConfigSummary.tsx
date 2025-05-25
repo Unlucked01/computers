@@ -44,7 +44,7 @@ export default function ConfigSummary({ selectedComponents, configuration }: Con
         const url = window.URL.createObjectURL(pdfBlob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `configuration_${configuration?.name || 'config'}.pdf`;
+        link.download = `конфигурация_${configuration?.name || 'config'}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

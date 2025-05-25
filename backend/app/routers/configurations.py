@@ -214,18 +214,26 @@ async def export_configuration_pdf(config_id: UUID, db: Session = Depends(get_db
         notes="Конфигурация создана с помощью веб-конфигуратора ПК"
     )
     
-    # Генерируем HTML файл
+    # Генерируем PDF файл
     pdf_service = PDFService()
-    html_path = pdf_service.generate_configuration_pdf(export_data)
+    file_path = pdf_service.generate_configuration_pdf(export_data)
     
     # Обновляем статус конфигурации
     config.status = "exported"
     db.commit()
     
+    # Определяем media_type и имя файла на основе расширения
+    if file_path.endswith('.pdf'):
+        media_type = "application/pdf"
+        filename = f"конфигурация_{config.name}.pdf"
+    else:
+        media_type = "text/html"
+        filename = f"конфигурация_{config.name}.html"
+    
     return FileResponse(
-        html_path,
-        media_type="text/html",
-        filename=f"configuration_{config.name}.html"
+        file_path,
+        media_type=media_type,
+        filename=filename
     )
 
 
