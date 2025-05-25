@@ -6,15 +6,15 @@ services:
       dockerfile: Dockerfile
     container_name: pc_configurator_backend
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:5432/pc_configurator
-      DATABASE_HOST: host.docker.internal
+      DATABASE_URL: postgresql://postgres:postgres@172.17.0.1:5432/pc_configurator
+      DATABASE_HOST: 172.17.0.1
       DATABASE_PORT: 5432
       DATABASE_USER: postgres
       DATABASE_PASSWORD: postgres
       DATABASE_NAME: pc_configurator
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-here}
       ENVIRONMENT: production
-      CORS_ORIGINS: https://unl-computers.duckdns.org,http://localhost:3000
+      CORS_ORIGINS: https://unl-computers.duckdns.org,http://localhost:3000,http://localhost:3001
       PDF_TEMP_PATH: /tmp/pc_configs
     ports:
       - "8000:8000"
@@ -22,6 +22,9 @@ services:
     volumes:
       - ./backend:/app
       - pdf_temp:/tmp/pc_configs
+    extra_hosts:
+      - "host.docker.internal:172.17.0.1"
+    network_mode: "bridge"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -43,6 +46,7 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    network_mode: "bridge"
 
 # Volumes для временных файлов
 volumes:
