@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Конфигурация ПК - {{ config.name }}</title>
+</head>
+<body>
+    <div class="header">
+        <h1>Конфигурация ПК</h1>
+        <p><strong>{{ config.name }}</strong></p>
+        {% if config.description %}
+        <p>{{ config.description }}</p>
+        {% endif %}
+        <p>Дата экспорта: {{ export_date }}</p>
+    </div>
+
+    <div class="section">
+        <h2>Общая информация</h2>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-value">{{ "₽{:,.0f}".format(total_price) }}</div>
+                <div class="summary-label">Общая стоимость</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ total_power or 0 }}Вт</div>
+                <div class="summary-label">Энергопотребление</div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <span class="compatibility-status {{ compatibility_status.lower() }}">
+                Совместимость: {{ compatibility_status }}
+            </span>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Компоненты</h2>
+        {% for category, components in components_by_category.items() %}
+        <div class="category">
+            <h3>{{ category }}</h3>
+            {% for component in components %}
+            <div class="component">
+                <div class="component-header">
+                    <div class="component-name">{{ component.brand }} {{ component.name }}</div>
+                    <div class="component-price">
+                        {% if component.quantity > 1 %}
+                        {{ component.quantity }}x {{ "₽{:,.0f}".format(component.price) }} = {{ "₽{:,.0f}".format(component.total) }}
+                        {% else %}
+                        {{ "₽{:,.0f}".format(component.price) }}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="component-details">
+                    <div><strong>Модель:</strong> {{ component.model }}</div>
+                    <div><strong>Наличие:</strong> {{ component.stock_status }}</div>
+                    {% if component.specifications %}
+                    <div><strong>Характеристики:</strong> {{ component.specifications }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if compatibility_issues %}
+    <div class="section">
+        <h2>Проблемы совместимости</h2>
+        {% for issue in compatibility_issues %}
+        <div class="issue {{ issue.severity }}">
+            <strong>{{ issue.type }} ({{ issue.severity }})</strong>
+            <p>{{ issue.message }}</p>
+            {% if issue.suggestions %}
+            <div><strong>Рекомендации:</strong></div>
+            <ul>
+                {% for suggestion in issue.suggestions %}
+                <li>{{ suggestion }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if recommended_psu %}
+    <div class="section">
+        <h2>Рекомендации по блоку питания</h2>
+        <p>
+            Текущее энергопотребление: <strong>{{ total_power }}Вт</strong><br>
+            Рекомендуемая мощность БП: <strong>{{ recommended_psu }}Вт+</strong>
+        </p>
+    </div>
+    {% endif %}
+
+    {% if notes %}
+    <div class="section">
+        <h2>Дополнительные заметки</h2>
+        <p>{{ notes }}</p>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <p>Конфигурация создана с помощью веб-конфигуратора ПК</p>
+        <p>Дата создания конфигурации: {{ config.created_at.strftime('%d.%m.%Y %H:%M') }}</p>
+        {% if config.public_uuid %}
+        <p>UUID: {{ config.public_uuid }}</p>
+        {% endif %}
+    </div>
+</body>
+</html> 

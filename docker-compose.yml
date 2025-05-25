@@ -1,0 +1,52 @@
+services:
+  # Backend API service
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pc_configurator_backend
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@events-db:5432/pc_configurator
+      DATABASE_HOST: events-db
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: pc_configurator
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-here}
+      ENVIRONMENT: production
+      CORS_ORIGINS: https://unl-computers.duckdns.org,http://localhost:3000
+    expose:
+      - "8000"
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend service  
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: pc_configurator_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: https://unl-computers.duckdns.org/api
+      NODE_ENV: production
+    expose:
+      - "3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - app_network
+
+# Подключаемся к внешней сети
+networks:
+  app_network:
+    external: true 
