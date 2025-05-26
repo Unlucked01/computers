@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
+import os
 
 
 class Settings(BaseSettings):
@@ -17,7 +18,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # CORS
-    CORS_ORIGINS: list = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    CORS_ORIGINS: list = [
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000",
+        "https://unl-computers.duckdns.org",
+        "https://unl-events.duckdns.org"
+    ]
     
     # Environment
     ENVIRONMENT: str = "development"
@@ -25,6 +31,14 @@ class Settings(BaseSettings):
     
     # PDF Generation
     PDF_TEMP_PATH: str = "/tmp/pc_configs"
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Читаем CORS_ORIGINS из переменной окружения если она есть
+        cors_env = os.getenv("CORS_ORIGINS")
+        if cors_env:
+            # Парсим строку как список, разделенный запятыми
+            self.CORS_ORIGINS = [origin.strip() for origin in cors_env.split(",")]
     
     class Config:
         env_file = ".env"
