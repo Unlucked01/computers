@@ -7,6 +7,7 @@ from ..models import Component, ComponentCategory, ComponentStock
 from ..schemas.component import ComponentResponse, ComponentFilter
 from ..schemas.configuration import CompatibilityCheck
 from ..services.compatibility_service import CompatibilityService
+import uuid
 
 router = APIRouter()
 
@@ -158,21 +159,65 @@ async def check_components_compatibility(
     if not component_ids:
         raise HTTPException(status_code=400, detail="Список компонентов не может быть пустым")
     
+    # Валидация UUID формата
+    invalid_uuids = []
+    for comp_id in component_ids:
+        try:
+            uuid.UUID(comp_id)
+        except ValueError:
+            invalid_uuids.append(comp_id)
+    
+    if invalid_uuids:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Некорректный формат UUID: {invalid_uuids}"
+        )
+    
     # Проверяем существование всех компонентов
     existing_components = db.query(Component.id).filter(Component.id.in_(component_ids)).all()
     existing_ids = {str(comp.id) for comp in existing_components}
     missing_ids = set(component_ids) - existing_ids
     
     if missing_ids:
+        # Получаем информацию о существующих компонентах для отладки
+        existing_count = len(existing_ids)
+        total_components = db.query(Component).count()
+        
         raise HTTPException(
             status_code=404, 
-            detail=f"Компоненты не найдены: {list(missing_ids)}"
+            detail={
+                "message": "Компоненты не найдены",
+                "missing_ids": list(missing_ids),
+                "existing_count": existing_count,
+                "total_components_in_db": total_components,
+                "requested_ids": component_ids
+            }
         )
     
     compatibility_service = CompatibilityService(db)
     result = compatibility_service.check_configuration_compatibility(component_ids)
     
     return result
+
+
+@router.get("/components/debug/ids")
+async def get_all_component_ids(db: Session = Depends(get_db)):
+    """Получить все ID компонентов для отладки"""
+    components = db.query(Component.id, Component.name, Component.brand, Component.is_active).all()
+    
+    return {
+        "total_count": len(components),
+        "active_count": len([c for c in components if c.is_active]),
+        "components": [
+            {
+                "id": str(comp.id),
+                "name": comp.name,
+                "brand": comp.brand,
+                "is_active": comp.is_active
+            }
+            for comp in components
+        ]
+    }
 
 
 @router.get("/components/filters/options")

@@ -132,7 +132,7 @@ export default function About() {
                 <div className="bg-white p-8 rounded-2xl shadow-xl">
                   <div className="grid grid-cols-2 gap-6">
                     <div className="text-center">
-                      <div className="text-3xl font-bold text-blue-600">2024</div>
+                      <div className="text-3xl font-bold text-blue-600">2025</div>
                       <div className="text-sm text-gray-600">Год разработки</div>
                     </div>
                     <div className="text-center">
@@ -304,13 +304,12 @@ export default function About() {
                   </div>
                   
                   <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                    Дипломный проект бакалавра
+                    Дипломный проект Анохина М.А.
                   </h3>
                   
                   <div className="text-gray-600 space-y-2 mb-6">
-                    <p>Специальность: Информационные системы и технологии</p>
-                    <p>Направление: Веб-разработка и проектирование систем</p>
-                    <p>Год защиты: 2024</p>
+                    <p>Специальность: Программная инженерия</p>
+                    <p>Год защиты: 2025</p>
                   </div>
 
                   <div className="flex justify-center space-x-4">

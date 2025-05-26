@@ -92,10 +92,22 @@ async def add_component_to_configuration(
     if not config:
         raise HTTPException(status_code=404, detail="Конфигурация не найдена")
     
-    # Проверяем существование компонента
+    # Проверяем существование компонента с подробной информацией
     component = db.query(Component).filter(Component.id == item_data.component_id).first()
     if not component:
-        raise HTTPException(status_code=404, detail="Компонент не найден")
+        # Получаем дополнительную информацию для отладки
+        total_components = db.query(Component).count()
+        active_components = db.query(Component).filter(Component.is_active == True).count()
+        
+        raise HTTPException(
+            status_code=404, 
+            detail={
+                "message": "Компонент не найден",
+                "requested_id": str(item_data.component_id),
+                "total_components_in_db": total_components,
+                "active_components_in_db": active_components
+            }
+        )
     
     # Проверяем, нет ли уже такого компонента в конфигурации
     existing_item = db.query(ConfigurationItem).filter(

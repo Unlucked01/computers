@@ -53,6 +53,7 @@ class ConfigurationResponse(BaseModel):
     id: UUID
     name: str
     description: Optional[str]
+    public_uuid: Optional[str]
     total_price: float
     total_power_consumption: Optional[int]
     compatibility_status: CompatibilityStatus
