@@ -31,10 +31,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Делаем entrypoint скрипт исполняемым
-RUN chmod +x ./entrypoint.sh
+# Конвертируем окончания строк из Windows в Unix формат и делаем скрипт исполняемым
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"] 
