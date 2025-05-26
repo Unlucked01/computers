@@ -1,30 +1,47 @@
 services:
-  # Backend API service
+  db:
+    image: postgres:15
+    container_name: pc_configurator_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pc_configurator
+    volumes:
+      - pc_config_db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # Локальный порт другой, чтобы не конфликтовать с events
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pc_configurator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   backend:
     build: 
       context: ./backend
       dockerfile: Dockerfile
     container_name: pc_configurator_backend
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@172.17.0.1:5432/pc_configurator
-      DATABASE_HOST: 172.17.0.1
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/pc_configurator
+      DATABASE_HOST: db
       DATABASE_PORT: 5432
       DATABASE_USER: postgres
       DATABASE_PASSWORD: postgres
       DATABASE_NAME: pc_configurator
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-here}
       ENVIRONMENT: production
-      CORS_ORIGINS: https://unl-computers.duckdns.org,http://localhost:3000,http://localhost:3001
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001
       PDF_TEMP_PATH: /tmp/pc_configs
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8000:8000"
     restart: unless-stopped
     volumes:
       - ./backend:/app
       - pdf_temp:/tmp/pc_configs
-    extra_hosts:
-      - "host.docker.internal:172.17.0.1"
-    network_mode: "bridge"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -32,22 +49,21 @@ services:
       retries: 3
       start_period: 40s
 
-  # Frontend service  
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.prod
+      dockerfile: Dockerfile
     container_name: pc_configurator_frontend
     environment:
-      NEXT_PUBLIC_API_URL: https://unl-computers.duckdns.org/api
-      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NODE_ENV: development
     ports:
       - "3000:3000"
-    depends_on:
-      - backend
     restart: unless-stopped
-    network_mode: "bridge"
+    depends_on:
+      backend:
+        condition: service_healthy
 
-# Volumes для временных файлов
 volumes:
-  pdf_temp: 
+  pdf_temp:
+  pc_config_db_data:

@@ -70,204 +70,199 @@ computers/
 └── README.md
 ```
 
-## 🛠️ Установка и запуск
+## 🚀 Быстрый запуск
 
 ### Предварительные требования
 
-- Node.js 18+ и npm 8+
-- Python 3.11+
-- PostgreSQL 14+
+- Docker и Docker Compose
 - Git
 
-### Клонирование репозитория
+### Запуск приложения
 
-```bash
-git clone <repository-url>
-cd computers
+1. **Клонируйте репозиторий:**
+   ```bash
+   git clone <repository-url>
+   cd computers
+   ```
+
+2. **Запустите приложение:**
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **Проверьте работу:**
+   ```bash
+   ./test_setup.sh
+   ```
+
+### Доступ к приложению
+
+- **Frontend:** http://localhost:3000
+- **Backend API:** http://localhost:8000
+- **API Документация:** http://localhost:8000/docs
+- **База данных:** localhost:5433 (postgres/postgres)
+
+## 🏗️ Архитектура
+
+### Backend (FastAPI + PostgreSQL)
+
+- **Порт:** 8000
+- **База данных:** PostgreSQL 15
+- **ORM:** SQLAlchemy
+- **Миграции:** Alembic
+- **API документация:** Swagger/OpenAPI
+
+### Frontend (Next.js)
+
+- **Порт:** 3000
+- **Framework:** Next.js 14
+- **Стили:** Tailwind CSS
+
+### База данных
+
+Автоматическая инициализация включает:
+
+1. **Создание таблиц** через Alembic миграции
+2. **Заполнение данными** из `backend/init.sql`:
+   - 8 категорий компонентов
+   - 18+ компонентов (процессоры, материнские платы, память, видеокарты, накопители, БП, корпуса)
+   - Информация о наличии компонентов
+
+## 🔧 Разработка
+
+### Структура проекта
+
+```
+computers/
+├── backend/                 # FastAPI приложение
+│   ├── app/                # Основной код приложения
+│   ├── alembic/            # Миграции базы данных
+│   ├── init.sql            # Начальные данные
+│   ├── entrypoint.sh       # Скрипт инициализации
+│   └── Dockerfile          # Docker образ backend
+├── frontend/               # Next.js приложение
+├── docker-compose.yml      # Конфигурация Docker
+└── test_setup.sh          # Скрипт тестирования
 ```
 
-### Запуск Backend
+### Команды для разработки
 
-1. Переход в директорию backend:
+**Остановка сервисов:**
 ```bash
-cd backend
-```
-
-2. Создание виртуального окружения:
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# или
-venv\Scripts\activate     # Windows
-```
-
-3. Установка зависимостей:
-```bash
-pip install -r requirements.txt
-```
-
-4. Настройка базы данных:
-```bash
-# Создайте базу данных PostgreSQL
-# Настройте переменные окружения в .env файле
-cp .env.example .env
-```
-
-5. Запуск миграций:
-```bash
-alembic upgrade head
-```
-
-6. Запуск сервера:
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Backend будет доступен по адресу: http://localhost:8000
-API документация: http://localhost:8000/docs
-
-### Запуск Frontend
-
-1. Переход в директорию frontend:
-```bash
-cd frontend
-```
-
-2. Установка зависимостей:
-```bash
-npm install
-```
-
-3. Настройка переменных окружения:
-```bash
-cp .env.example .env.local
-```
-
-4. Запуск сервера разработки:
-```bash
-npm run dev
-```
-
-Frontend будет доступен по адресу: http://localhost:3000
-
-## 🐳 Запуск с Docker
-
-### Используя Docker Compose
-
-```bash
-# Запуск всех сервисов
-docker-compose up -d
-
-# Просмотр логов
-docker-compose logs -f
-
-# Остановка сервисов
 docker-compose down
 ```
 
-### Отдельные контейнеры
-
-Backend:
+**Пересборка и запуск:**
 ```bash
-cd backend
-docker build -t pc-configurator-backend .
-docker run -p 8000:8000 pc-configurator-backend
+docker-compose up --build -d
 ```
 
-Frontend:
+**Просмотр логов:**
 ```bash
-cd frontend
-docker build -t pc-configurator-frontend .
-docker run -p 3000:3000 pc-configurator-frontend
+docker-compose logs -f backend
+docker-compose logs -f frontend
 ```
 
-## 📝 API документация
+**Подключение к базе данных:**
+```bash
+docker-compose exec db psql -U postgres -d pc_configurator
+```
 
-### Основные эндпоинты
+### Создание новых миграций
 
-- `GET /api/categories` - получение категорий компонентов
-- `GET /api/components` - получение списка компонентов с фильтрацией
-- `GET /api/components/category/{slug}` - компоненты по категории
-- `POST /api/compatibility/check` - проверка совместимости
-- `POST /api/configurations` - создание конфигурации
-- `GET /api/configurations/{id}/export` - экспорт в PDF
+```bash
+docker-compose exec backend alembic revision --autogenerate -m "описание изменений"
+docker-compose exec backend alembic upgrade head
+```
 
-Полная документация доступна по адресу: http://localhost:8000/docs
+## 📊 API Endpoints
 
-## 🎨 Дизайн-система
-
-Проект использует собственную дизайн-систему на основе Tailwind CSS:
-
-### Цветовая палитра
-- **Primary**: оттенки синего (#3b82f6)
-- **Secondary**: оттенки серого (#64748b)
-- **Success**: зеленые тона (#22c55e)
-- **Warning**: желтые тона (#f59e0b)
-- **Error**: красные тона (#ef4444)
+### Категории компонентов
+- `GET /api/v1/categories` - Список всех категорий
+- `GET /api/v1/categories/{slug}` - Категория по slug
 
 ### Компоненты
-- Кнопки: `.btn-primary`, `.btn-secondary`, `.btn-outline`
-- Карточки: `.card`
-- Поля ввода: `.input`
-- Анимации: `.animate-fade-in`, `.animate-slide-up`
+- `GET /api/v1/components` - Список компонентов с фильтрацией
+- `GET /api/v1/components/{id}` - Компонент по ID
+- `GET /api/v1/components/category/{category_slug}` - Компоненты категории
+
+### Конфигурации
+- `POST /api/v1/configurations` - Создание конфигурации
+- `GET /api/v1/configurations/{id}` - Получение конфигурации
+- `PUT /api/v1/configurations/{id}` - Обновление конфигурации
+- `GET /api/v1/configurations/{id}/pdf` - Экспорт в PDF
 
 ## 🧪 Тестирование
 
-### Frontend
+Автоматический тест всей системы:
+
 ```bash
-cd frontend
-npm run test
-npm run test:coverage
+./test_setup.sh
 ```
 
-### Backend
-```bash
-cd backend
-pytest
-pytest --cov=app tests/
+Тест проверяет:
+- ✅ Запуск всех сервисов
+- ✅ Создание таблиц через миграции
+- ✅ Загрузку начальных данных
+- ✅ Работу API endpoints
+- ✅ Наличие данных в базе
+
+## 🔒 Переменные окружения
+
+Основные переменные (настраиваются в `docker-compose.yml`):
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@db:5432/pc_configurator
+JWT_SECRET_KEY=your-secret-key-here
+ENVIRONMENT=production
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001
 ```
 
-## 📦 Сборка для продакшена
+## 🐛 Устранение неполадок
 
-### Frontend
+### База данных не запускается
 ```bash
-cd frontend
-npm run build
-npm run start
+docker-compose down -v  # Удаляет volumes
+docker-compose up -d db
 ```
 
-### Backend
+### Backend не может подключиться к БД
 ```bash
-cd backend
-# Настройка переменных окружения для продакшена
-export ENV=production
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+docker-compose logs backend
+docker-compose exec db pg_isready -U postgres
 ```
 
-## 🚀 Деплой
-
-### Использование Docker
-
-1. Сборка образов:
+### Проблемы с миграциями
 ```bash
-docker-compose -f docker-compose.prod.yml build
+docker-compose exec backend alembic current
+docker-compose exec backend alembic history
 ```
 
-2. Запуск в продакшене:
+### Очистка и пересоздание
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose down -v
+docker system prune -f
+docker-compose up --build -d
 ```
+
+## 📝 Логи и мониторинг
+
+**Просмотр логов в реальном времени:**
+```bash
+docker-compose logs -f
+```
+
+**Health checks:**
+- Backend: http://localhost:8000/health
+- Database: `docker-compose exec db pg_isready -U postgres`
 
 ## 🤝 Вклад в проект
 
-Этот проект является дипломной работой. Если у вас есть предложения по улучшению:
-
-1. Создайте Issue для обсуждения изменений
-2. Сделайте Fork репозитория
-3. Создайте feature branch (`git checkout -b feature/AmazingFeature`)
-4. Зафиксируйте изменения (`git commit -m 'Add some AmazingFeature'`)
-5. Отправьте в branch (`git push origin feature/AmazingFeature`)
-6. Откройте Pull Request
+1. Форкните репозиторий
+2. Создайте ветку для новой функции
+3. Внесите изменения
+4. Запустите тесты: `./test_setup.sh`
+5. Создайте Pull Request
 
 ## 📄 Лицензия
 
