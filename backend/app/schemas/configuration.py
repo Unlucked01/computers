@@ -37,7 +37,25 @@ class ConfigurationItemCreate(BaseModel):
     notes: Optional[str] = None
 
 
+class ConfigurationAccessoryCreate(BaseModel):
+    component_id: UUID
+    quantity: int = Field(1, ge=1)
+    notes: Optional[str] = None
+
+
 class ConfigurationItemResponse(BaseModel):
+    id: UUID
+    component: ComponentResponse
+    quantity: int
+    price_snapshot: Optional[float]
+    notes: Optional[str]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class ConfigurationAccessoryResponse(BaseModel):
     id: UUID
     component: ComponentResponse
     quantity: int
@@ -63,6 +81,7 @@ class ConfigurationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: List[ConfigurationItemResponse]
+    accessories: List[ConfigurationAccessoryResponse] = []
     
     class Config:
         from_attributes = True

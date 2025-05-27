@@ -8,9 +8,10 @@ export default function Header() {
 
   const navigation = [
     { name: 'Конфигуратор', href: '/' },
-    { name: 'О проекте', href: '/about' },
+    { name: 'Компоненты', href: '/components' },
     { name: 'Аксессуары', href: '/accessories' },
-    { name: 'Программы', href: '/software' },
+    { name: 'Импорт', href: '/import' },
+    { name: 'О проекте', href: '/about' },
   ];
 
   return (

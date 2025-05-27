@@ -137,9 +137,16 @@ export default function ComponentSelector({
       {/* Заголовок */}
       <div className="p-4 border-b bg-gray-50">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">
-            {getCategoryName(category)}
-          </h3>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">
+              {getCategoryName(category)}
+            </h3>
+            {!isLoading && (
+              <p className="text-sm text-gray-500">
+                Найдено: {components.length} компонентов
+              </p>
+            )}
+          </div>
           {selectedComponent && (
             <button
               onClick={onComponentRemove}
@@ -159,8 +166,13 @@ export default function ComponentSelector({
             placeholder="Поиск компонентов..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="input pl-10 w-full"
+            className="input pl-10 pr-10 w-full"
           />
+          {isLoading && (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+            </div>
+          )}
         </div>
 
         {/* Фильтры */}
@@ -241,7 +253,7 @@ export default function ComponentSelector({
       )}
 
       {/* Список компонентов */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar" style={{ maxHeight: 'calc(100vh - 400px)', minHeight: '300px' }}>
         {components.length === 0 ? (
           <div className="p-8 text-center">
             <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />

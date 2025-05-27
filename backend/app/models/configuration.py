@@ -43,6 +43,7 @@ class Configuration(Base):
     
     # Связи
     items = relationship("ConfigurationItem", back_populates="configuration")
+    accessories = relationship("ConfigurationAccessory", back_populates="configuration")
 
 
 class ConfigurationItem(Base):
@@ -67,4 +68,29 @@ class ConfigurationItem(Base):
     
     # Связи
     configuration = relationship("Configuration", back_populates="items")
+    component = relationship("Component")
+
+
+class ConfigurationAccessory(Base):
+    """Аксессуары в конфигурации"""
+    __tablename__ = "configuration_accessories"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    configuration_id = Column(UUID(as_uuid=True), ForeignKey("configurations.id"), nullable=False, index=True)
+    component_id = Column(UUID(as_uuid=True), ForeignKey("components.id"), nullable=False, index=True)
+    
+    # Количество
+    quantity = Column(Integer, default=1)
+    
+    # Снимок цены на момент добавления
+    price_snapshot = Column(Numeric(precision=10, scale=2))
+    
+    # Дополнительные настройки/комментарии
+    notes = Column(Text)
+    
+    # Метаданные
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Связи
+    configuration = relationship("Configuration", back_populates="accessories")
     component = relationship("Component") 

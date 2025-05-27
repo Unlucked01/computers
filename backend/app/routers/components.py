@@ -112,10 +112,22 @@ async def get_component(component_id: str, db: Session = Depends(get_db)):
 @router.get("/components/category/{category_slug}", response_model=List[ComponentResponse])
 async def get_components_by_category(
     category_slug: str,
+    brand: Optional[List[str]] = Query(None, description="Фильтр по брендам"),
+    price_min: Optional[float] = Query(None, description="Минимальная цена"),
+    price_max: Optional[float] = Query(None, description="Максимальная цена"),
+    only_in_stock: bool = Query(False, description="Только товары в наличии"),
+    form_factor: Optional[List[str]] = Query(None, description="Фильтр по форм-фактору"),
+    power_max: Optional[int] = Query(None, description="Максимальное энергопотребление"),
+    search: Optional[str] = Query(None, description="Поиск по названию/модели"),
+    socket: Optional[List[str]] = Query(None, description="Фильтр по сокету"),
+    memory_type: Optional[List[str]] = Query(None, description="Фильтр по типу памяти"),
+    interface: Optional[List[str]] = Query(None, description="Фильтр по интерфейсу"),
+    page: int = Query(1, ge=1, description="Номер страницы"),
+    limit: int = Query(20, ge=1, le=100, description="Количество на странице"),
     compatible_with: Optional[List[str]] = Query(None, description="ID компонентов для проверки совместимости"),
     db: Session = Depends(get_db)
 ):
-    """Получить компоненты категории, опционально с проверкой совместимости"""
+    """Получить компоненты категории с фильтрацией и поиском"""
     
     # Проверяем существование категории
     category = db.query(ComponentCategory).filter(ComponentCategory.slug == category_slug).first()
@@ -130,7 +142,57 @@ async def get_components_by_category(
         Component.is_active == True
     )
     
-    components = query.all()
+    # Фильтр по бренду
+    if brand:
+        query = query.filter(Component.brand.in_(brand))
+    
+    # Фильтр по цене
+    if price_min is not None:
+        query = query.filter(Component.price >= price_min)
+    if price_max is not None:
+        query = query.filter(Component.price <= price_max)
+    
+    # Фильтр по наличию
+    if only_in_stock:
+        query = query.join(ComponentStock).filter(ComponentStock.status == "in_stock")
+    
+    # Фильтр по форм-фактору
+    if form_factor:
+        query = query.filter(Component.form_factor.in_(form_factor))
+    
+    # Фильтр по энергопотреблению
+    if power_max is not None:
+        query = query.filter(
+            or_(
+                Component.power_consumption <= power_max,
+                Component.power_consumption.is_(None)
+            )
+        )
+    
+    # Поиск по тексту
+    if search:
+        search_filter = or_(
+            Component.name.ilike(f"%{search}%"),
+            Component.model.ilike(f"%{search}%"),
+            Component.brand.ilike(f"%{search}%")
+        )
+        query = query.filter(search_filter)
+    
+    # Фильтр по сокету (для процессоров/материнок)
+    if socket:
+        query = query.filter(Component.specifications["socket"].astext.in_(socket))
+    
+    # Фильтр по типу памяти
+    if memory_type:
+        query = query.filter(Component.specifications["memory_type"].astext.in_(memory_type))
+    
+    # Фильтр по интерфейсу
+    if interface:
+        query = query.filter(Component.specifications["interface"].astext.in_(interface))
+    
+    # Пагинация
+    offset = (page - 1) * limit
+    components = query.offset(offset).limit(limit).all()
     
     # Если нужна проверка совместимости
     if compatible_with:

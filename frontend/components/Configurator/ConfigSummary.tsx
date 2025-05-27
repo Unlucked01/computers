@@ -4,6 +4,8 @@ import { Download, Save, Share2, ShoppingCart, Calculator, Package } from 'lucid
 import { Component, Configuration } from '../../types';
 import { formatPrice } from '../../lib/api';
 import { useConfiguratorStore } from '../../hooks/useConfiguratorStore';
+import AccessorySelector from './AccessorySelector';
+import { useRouter } from 'next/router';
 
 interface ConfigSummaryProps {
   selectedComponents: Record<string, Component>;
@@ -13,10 +15,12 @@ interface ConfigSummaryProps {
 export default function ConfigSummary({ selectedComponents, configuration }: ConfigSummaryProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showAccessorySelector, setShowAccessorySelector] = useState(false);
   const [configName, setConfigName] = useState('');
   const [configDescription, setConfigDescription] = useState('');
 
-  const { saveConfiguration, exportToPdf, isLoading } = useConfiguratorStore();
+  const { saveConfiguration, exportToPdf, addAccessoriesToConfiguration, isLoading } = useConfiguratorStore();
+  const router = useRouter();
 
   const componentList = Object.values(selectedComponents);
   const totalPrice = componentList.reduce((sum, component) => sum + component.price, 0);
@@ -36,8 +40,23 @@ export default function ConfigSummary({ selectedComponents, configuration }: Con
   };
 
   const handleExportPDF = async () => {
+    if (!isConfigurationSaved) {
+      return;
+    }
+    
+    // Показываем селектор аксессуаров перед экспортом
+    setShowAccessorySelector(true);
+  };
+
+  const handleAccessoriesSelected = async (selectedAccessories: Array<{component: Component, quantity: number}>) => {
     setIsExporting(true);
     try {
+      // Добавляем выбранные аксессуары в конфигурацию
+      if (selectedAccessories.length > 0) {
+        await addAccessoriesToConfiguration(selectedAccessories);
+      }
+      
+      // Экспортируем в PDF
       const pdfBlob = await exportToPdf();
       if (pdfBlob) {
         // Создаем ссылку для скачивания
@@ -194,6 +213,7 @@ export default function ConfigSummary({ selectedComponents, configuration }: Con
 
         {/* Покупка (заглушка) */}
         <button
+          onClick={() => router.push('/payment')}
           disabled={componentCount === 0}
           className="btn-secondary w-full flex items-center justify-center space-x-2"
         >
@@ -266,6 +286,13 @@ export default function ConfigSummary({ selectedComponents, configuration }: Con
           </motion.div>
         </motion.div>
       )}
+
+      {/* Селектор аксессуаров */}
+      <AccessorySelector
+        isOpen={showAccessorySelector}
+        onClose={() => setShowAccessorySelector(false)}
+        onConfirm={handleAccessoriesSelected}
+      />
     </div>
   );
 } 

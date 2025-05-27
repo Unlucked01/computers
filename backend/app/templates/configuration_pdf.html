@@ -4,6 +4,130 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Конфигурация ПК - {{ config.name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 20px;
+        }
+        .header h1 {
+            color: #2563eb;
+            margin: 0;
+        }
+        .section {
+            margin-bottom: 25px;
+        }
+        .section h2 {
+            color: #1f2937;
+            border-left: 4px solid #2563eb;
+            padding-left: 12px;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .summary-item {
+            text-align: center;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .summary-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2563eb;
+        }
+        .summary-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+        .category {
+            margin-bottom: 20px;
+        }
+        .category h3 {
+            color: #374151;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .component {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+        .component-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .component-name {
+            font-weight: bold;
+            color: #1f2937;
+        }
+        .component-price {
+            font-weight: bold;
+            color: #059669;
+        }
+        .component-details {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .component-details div {
+            margin-bottom: 4px;
+        }
+        .compatibility-status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .compatible { background: #d1fae5; color: #065f46; }
+        .warning { background: #fef3c7; color: #92400e; }
+        .incompatible { background: #fee2e2; color: #991b1b; }
+        .unknown { background: #f3f4f6; color: #374151; }
+        .issue {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 4px solid;
+        }
+        .issue.error {
+            background: #fee2e2;
+            border-color: #dc2626;
+            color: #991b1b;
+        }
+        .issue.warning {
+            background: #fef3c7;
+            border-color: #d97706;
+            color: #92400e;
+        }
+        .issue.info {
+            background: #dbeafe;
+            border-color: #2563eb;
+            color: #1e40af;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 12px;
+            color: #9ca3af;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 20px;
+        }
+    </style>
 </head>
 <body>
     <div class="header">
@@ -19,12 +143,24 @@
         <h2>Общая информация</h2>
         <div class="summary-grid">
             <div class="summary-item">
-                <div class="summary-value">{{ "₽{:,.0f}".format(total_price) }}</div>
-                <div class="summary-label">Общая стоимость</div>
+                <div class="summary-value">{{ "₽{:,.0f}".format(components_total) }}</div>
+                <div class="summary-label">Стоимость компонентов</div>
             </div>
+            {% if accessories_total > 0 %}
+            <div class="summary-item">
+                <div class="summary-value">{{ "₽{:,.0f}".format(accessories_total) }}</div>
+                <div class="summary-label">Стоимость аксессуаров</div>
+            </div>
+            {% endif %}
             <div class="summary-item">
                 <div class="summary-value">{{ total_power or 0 }}Вт</div>
                 <div class="summary-label">Энергопотребление</div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px; padding: 15px; background: #e0f2fe; border-radius: 8px; text-align: center;">
+            <div style="font-size: 24px; font-weight: bold; color: #01579b;">
+                ИТОГО: {{ "₽{:,.0f}".format(total_price) }}
             </div>
         </div>
         
@@ -64,6 +200,40 @@
         </div>
         {% endfor %}
     </div>
+
+    {% if accessories %}
+    <div class="section">
+        <h2>Аксессуары</h2>
+        {% for accessory in accessories %}
+        <div class="component">
+            <div class="component-header">
+                <div class="component-name">{{ accessory.component.brand }} {{ accessory.component.name }}</div>
+                <div class="component-price">
+                    {% if accessory.quantity > 1 %}
+                    {{ accessory.quantity }}x {{ "₽{:,.0f}".format(accessory.price_snapshot or accessory.component.price) }} = {{ "₽{:,.0f}".format((accessory.price_snapshot or accessory.component.price) * accessory.quantity) }}
+                    {% else %}
+                    {{ "₽{:,.0f}".format(accessory.price_snapshot or accessory.component.price) }}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="component-details">
+                <div><strong>Модель:</strong> {{ accessory.component.model }}</div>
+                <div><strong>Тип:</strong> {{ accessory.component.specifications.get('type', 'Аксессуар') if accessory.component.specifications else 'Аксессуар' }}</div>
+                <div><strong>Наличие:</strong> {{ accessory.component.stock.status if accessory.component.stock else 'Неизвестно' }}</div>
+                {% if accessory.notes %}
+                <div><strong>Заметки:</strong> {{ accessory.notes }}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+            <div style="text-align: right; font-weight: bold; color: #059669;">
+                Стоимость аксессуаров: {{ "₽{:,.0f}".format(accessories_total) }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     {% if compatibility_issues %}
     <div class="section">

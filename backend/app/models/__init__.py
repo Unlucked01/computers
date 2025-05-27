@@ -1,5 +1,5 @@
 from .component import Component, ComponentCategory, ComponentCompatibility, ComponentStock
-from .configuration import Configuration, ConfigurationItem
+from .configuration import Configuration, ConfigurationItem, ConfigurationAccessory
 
 __all__ = [
     "Component",
@@ -7,5 +7,6 @@ __all__ = [
     "ComponentCompatibility",
     "ComponentStock",
     "Configuration",
-    "ConfigurationItem"
+    "ConfigurationItem",
+    "ConfigurationAccessory"
 ] 

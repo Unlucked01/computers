@@ -84,15 +84,15 @@ class PDFService:
                 raise Exception("PDF файл не был создан")
             
         except Exception as e:
-            # В случае ошибки генерируем простой HTML отчет как fallback
+            # В случае ошибки генерируем HTML отчет с помощью Jinja2 шаблона
             logger.error(f"Ошибка генерации PDF: {e}", exc_info=True)
             
-            # Создаем HTML файл как резервный вариант
+            # Создаем HTML файл с помощью Jinja2 шаблона
             html_filename = f"config_{export_data.configuration.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
             html_path = os.path.join(settings.PDF_TEMP_PATH, html_filename)
             
-            logger.info("Создаю HTML файл как резервный вариант")
-            html_content = self._generate_simple_html_report(export_data)
+            logger.info("Создаю HTML файл с помощью Jinja2 шаблона")
+            html_content = self._generate_html_from_template(export_data)
             
             with open(html_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
@@ -100,145 +100,66 @@ class PDFService:
             logger.info(f"HTML файл создан: {html_path}")
             return html_path
     
-    def _generate_simple_html_report(self, export_data: ConfigurationExport) -> str:
-        """Генерация простого HTML отчета"""
+    def _generate_html_from_template(self, export_data: ConfigurationExport) -> str:
+        """Генерация HTML отчета с помощью Jinja2 шаблона"""
         
         config = export_data.configuration
         compatibility = export_data.compatibility_check
         
-        # Считаем общую стоимость
-        total_price = sum((item.price_snapshot or item.component.price) * item.quantity for item in config.items)
+        # Подготавливаем данные для шаблона
+        components_total = sum((item.price_snapshot or item.component.price) * item.quantity for item in config.items)
+        accessories_total = sum((acc.price_snapshot or acc.component.price) * acc.quantity for acc in config.accessories) if config.accessories else 0
+        total_price = components_total + accessories_total
         
-        html = f"""
-        <!DOCTYPE html>
-        <html lang="ru">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Конфигурация ПК - {config.name}</title>
-            <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    line-height: 1.6;
-                    margin: 20px;
-                    color: #333;
-                }}
-                .header {{
-                    text-align: center;
-                    margin-bottom: 30px;
-                    border-bottom: 2px solid #eee;
-                    padding-bottom: 20px;
-                }}
-                .header h1 {{
-                    color: #2563eb;
-                    margin: 0;
-                }}
-                .section {{
-                    margin-bottom: 25px;
-                }}
-                .section h2 {{
-                    color: #1f2937;
-                    border-left: 4px solid #2563eb;
-                    padding-left: 12px;
-                }}
-                .component {{
-                    background: #f9fafb;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 6px;
-                    padding: 12px;
-                    margin-bottom: 8px;
-                }}
-                .component-name {{
-                    font-weight: bold;
-                    color: #1f2937;
-                }}
-                .component-price {{
-                    font-weight: bold;
-                    color: #059669;
-                }}
-                .total {{
-                    font-size: 24px;
-                    font-weight: bold;
-                    color: #2563eb;
-                    text-align: center;
-                    margin: 20px 0;
-                    padding: 20px;
-                    background: #f0f9ff;
-                    border-radius: 8px;
-                }}
-                .compatibility {{
-                    padding: 10px;
-                    border-radius: 6px;
-                    margin: 10px 0;
-                }}
-                .compatible {{ background: #d1fae5; color: #065f46; }}
-                .warning {{ background: #fef3c7; color: #92400e; }}
-                .incompatible {{ background: #fee2e2; color: #991b1b; }}
-                .unknown {{ background: #f3f4f6; color: #374151; }}
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>Конфигурация ПК</h1>
-                <h2>{config.name}</h2>
-                {f'<p>{config.description}</p>' if config.description else ''}
-                <p>Дата экспорта: {export_data.export_date.strftime('%d.%m.%Y %H:%M')}</p>
-            </div>
-
-            <div class="section">
-                <h2>Компоненты</h2>
-        """
-        
-        # Добавляем компоненты
+        # Группируем компоненты по категориям
+        components_by_category = {}
         for item in config.items:
-            price = item.price_snapshot or item.component.price
-            html += f"""
-                <div class="component">
-                    <div class="component-name">{item.component.category.name}: {item.component.brand} {item.component.name}</div>
-                    <div>Модель: {item.component.model}</div>
-                    <div>Количество: {item.quantity}</div>
-                    <div class="component-price">Цена: {price:,.0f} руб.</div>
-                </div>
-            """
+            category = item.component.category.name
+            if category not in components_by_category:
+                components_by_category[category] = []
+            
+            component_data = {
+                'brand': item.component.brand,
+                'name': item.component.name,
+                'model': item.component.model,
+                'quantity': item.quantity,
+                'price': item.price_snapshot or item.component.price,
+                'total': (item.price_snapshot or item.component.price) * item.quantity,
+                'stock_status': self._get_stock_status_text(item.component.stock.status if item.component.stock else 'unknown'),
+                'specifications': self._format_specifications(item.component.specifications) if item.component.specifications else None
+            }
+            components_by_category[category].append(component_data)
         
-        html += f"""
-            </div>
-
-            <div class="total">
-                Общая стоимость: {total_price:,.0f} руб.
-            </div>
-
-            <div class="section">
-                <h2>Совместимость</h2>
-                <div class="compatibility {compatibility.status.lower()}">
-                    Статус: {self._get_compatibility_status_text(compatibility.status)}
-                </div>
-                {f'<p>Общее энергопотребление: {compatibility.total_power_consumption} Вт</p>' if compatibility.total_power_consumption else ''}
-                {f'<p>Рекомендуемая мощность БП: {compatibility.recommended_psu_wattage} Вт</p>' if compatibility.recommended_psu_wattage else ''}
-        """
+        # Подготавливаем данные аксессуаров
+        accessories = []
+        if config.accessories:
+            for acc in config.accessories:
+                accessories.append({
+                    'component': acc.component,
+                    'quantity': acc.quantity,
+                    'price_snapshot': acc.price_snapshot,
+                    'notes': acc.notes
+                })
         
-        # Добавляем проблемы совместимости
-        if compatibility.issues:
-            html += "<h3>Проблемы совместимости:</h3>"
-            for issue in compatibility.issues:
-                html += f"""
-                    <div class="compatibility {issue.severity}">
-                        <strong>{issue.type} ({issue.severity}):</strong> {issue.message}
-                        {f'<br><em>Рекомендации: {", ".join(issue.suggestions)}</em>' if issue.suggestions else ''}
-                    </div>
-                """
+        # Подготавливаем данные для шаблона
+        template_data = {
+            'config': config,
+            'export_date': export_data.export_date.strftime('%d.%m.%Y %H:%M'),
+            'components_total': components_total,
+            'accessories_total': accessories_total,
+            'total_price': total_price,
+            'total_power': compatibility.total_power_consumption,
+            'compatibility_status': self._get_compatibility_status_text(compatibility.status),
+            'components_by_category': components_by_category,
+            'accessories': accessories,
+            'compatibility_issues': compatibility.issues,
+            'recommended_psu': compatibility.recommended_psu_wattage,
+            'notes': export_data.notes
+        }
         
-        html += """
-            </div>
-
-            <div style="text-align: center; margin-top: 40px; font-size: 12px; color: #9ca3af;">
-                <p>Конфигурация создана с помощью веб-конфигуратора ПК</p>
-            </div>
-        </body>
-        </html>
-        """
-        
-        return html
+        # Рендерим шаблон
+        template = self.jinja_env.get_template('configuration_pdf.html')
+        return template.render(**template_data)
     
     def _get_compatibility_status_text(self, status: str) -> str:
         """Получить текстовое описание статуса совместимости"""
@@ -336,13 +257,22 @@ class PDFService:
         story.append(Spacer(1, 1*cm))
         
         # === ОБЩАЯ ИНФОРМАЦИЯ ===
-        total_price = sum((item.price_snapshot or item.component.price) * item.quantity for item in config.items)
+        components_total = sum((item.price_snapshot or item.component.price) * item.quantity for item in config.items)
+        accessories_total = sum((acc.price_snapshot or acc.component.price) * acc.quantity for acc in config.accessories) if config.accessories else 0
+        total_price = components_total + accessories_total
         
         # Создаем таблицу с общей информацией
         info_data = [
+            ['СТОИМОСТЬ КОМПОНЕНТОВ', f'{components_total:,.0f} ₽'.replace(',', ' ')],
+        ]
+        
+        if accessories_total > 0:
+            info_data.append(['СТОИМОСТЬ АКСЕССУАРОВ', f'{accessories_total:,.0f} ₽'.replace(',', ' ')])
+        
+        info_data.extend([
             ['ОБЩАЯ СТОИМОСТЬ', f'{total_price:,.0f} ₽'.replace(',', ' ')],
             ['СТАТУС СОВМЕСТИМОСТИ', self._get_compatibility_status_text(compatibility.status)],
-        ]
+        ])
         
         if compatibility.total_power_consumption:
             info_data.append(['ЭНЕРГОПОТРЕБЛЕНИЕ', f'{compatibility.total_power_consumption} Вт'])
@@ -361,6 +291,10 @@ class PDFService:
             ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ('TOPPADDING', (0, 0), (-1, -1), 8),
             ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#2563eb')),  # Синяя линия под заголовком
+            # Выделяем строку с общей стоимостью
+            ('BACKGROUND', (0, -4 if accessories_total > 0 else -3), (-1, -4 if accessories_total > 0 else -3), colors.HexColor('#e0f2fe')),
+            ('TEXTCOLOR', (1, -4 if accessories_total > 0 else -3), (1, -4 if accessories_total > 0 else -3), colors.HexColor('#01579b')),
+            ('FONTSIZE', (0, -4 if accessories_total > 0 else -3), (-1, -4 if accessories_total > 0 else -3), 13),
         ]))
         
         story.append(info_table)
@@ -413,6 +347,43 @@ class PDFService:
                 ]))
                 
                 story.append(component_table)
+                story.append(Spacer(1, 0.4*cm))
+        
+        # === АКСЕССУАРЫ ===
+        if config.accessories:
+            story.append(Spacer(1, 0.5*cm))
+            story.append(Paragraph("АКСЕССУАРЫ", styles['section_header']))
+            story.append(Spacer(1, 0.5*cm))
+            
+            for accessory in config.accessories:
+                price = accessory.price_snapshot or accessory.component.price
+                
+                # Создаем таблицу для каждого аксессуара
+                accessory_data = [
+                    [f"{accessory.component.brand} {accessory.component.name}", f'{price:,.0f} ₽'.replace(',', ' ')],
+                    [f"Модель: {accessory.component.model}", f"Количество: {accessory.quantity}"]
+                ]
+                
+                accessory_table = Table(accessory_data, colWidths=[10*cm, 4*cm])
+                accessory_table.setStyle(TableStyle([
+                    ('FONTNAME', (0, 0), (-1, -1), font_name),
+                    ('FONTSIZE', (0, 0), (1, 0), 12),  # Название аксессуара
+                    ('FONTSIZE', (0, 1), (1, 1), 10),  # Детали
+                    ('FONTNAME', (0, 0), (0, 0), font_name),  # Жирный для названия
+                    ('FONTNAME', (1, 0), (1, 0), font_name),  # Жирный для цены
+                    ('TEXTCOLOR', (0, 0), (0, 0), colors.HexColor('#1f2937')),
+                    ('TEXTCOLOR', (1, 0), (1, 0), colors.HexColor('#059669')),  # Зеленый для цены
+                    ('TEXTCOLOR', (0, 1), (1, 1), colors.HexColor('#6b7280')),
+                    ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                    ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f0f9ff')),  # Слегка другой цвет для аксессуаров
+                    ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+                ]))
+                
+                story.append(accessory_table)
                 story.append(Spacer(1, 0.4*cm))
         
         # === СОВМЕСТИМОСТЬ ===

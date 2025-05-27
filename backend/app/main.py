@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from .config import settings
 from .database import engine, Base
-from .routers import components, configurations, categories
+from .routers import components, configurations, categories, accessories
 import os
 import logging
 import time
@@ -70,11 +70,13 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(categories.router, prefix="/api/v1", tags=["Категории"])
 app.include_router(components.router, prefix="/api/v1", tags=["Компоненты"])
 app.include_router(configurations.router, prefix="/api/v1", tags=["Конфигурации"])
+app.include_router(accessories.router, prefix="/api/v1", tags=["Аксессуары"])
 
 # Добавляем роутеры без префикса для совместимости с фронтендом
 app.include_router(categories.router, tags=["Категории (без префикса)"])
 app.include_router(components.router, tags=["Компоненты (без префикса)"])
 app.include_router(configurations.router, tags=["Конфигурации (без префикса)"])
+app.include_router(accessories.router, tags=["Аксессуары (без префикса)"])
 
 @app.get("/")
 async def root():

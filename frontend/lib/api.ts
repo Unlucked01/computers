@@ -117,6 +117,18 @@ export const configurationsApi = {
     });
     return response.data;
   },
+
+  addAccessory: async (configId: string, componentId: string, quantity: number = 1, notes?: string): Promise<void> => {
+    await api.post(`/configurations/${configId}/accessories`, {
+      component_id: componentId,
+      quantity,
+      notes,
+    });
+  },
+
+  removeAccessory: async (configId: string, accessoryId: string): Promise<void> => {
+    await api.delete(`/configurations/${configId}/accessories/${accessoryId}`);
+  },
 };
 
 // Экспорт для обратной совместимости

@@ -9,6 +9,7 @@ interface ConfiguratorStore extends ConfiguratorState {
   clearConfiguration: () => void;
   checkCompatibility: () => Promise<void>;
   saveConfiguration: (name: string, description?: string) => Promise<void>;
+  addAccessoriesToConfiguration: (accessories: Array<{component: Component, quantity: number}>) => Promise<void>;
   exportToPdf: () => Promise<Blob | null>;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -140,6 +141,37 @@ export const useConfiguratorStore = create<ConfiguratorStore>((set, get) => ({
       set({
         isLoading: false,
         error: error instanceof Error ? error.message : 'Ошибка сохранения конфигурации',
+      });
+    }
+  },
+
+  addAccessoriesToConfiguration: async (accessories: Array<{component: Component, quantity: number}>) => {
+    const state = get();
+    
+    if (!state.currentConfiguration?.id || state.currentConfiguration.id === '0') {
+      set({ error: 'Сначала необходимо сохранить конфигурацию' });
+      return;
+    }
+
+    set({ isLoading: true });
+
+    try {
+      for (const { component, quantity } of accessories) {
+        await configurationsApi.addAccessory(state.currentConfiguration.id, component.id, quantity);
+      }
+
+      // Получаем обновленную конфигурацию
+      const updatedConfig = await configurationsApi.getById(state.currentConfiguration.id);
+      
+      set({
+        currentConfiguration: updatedConfig,
+        isLoading: false,
+        error: undefined,
+      });
+    } catch (error) {
+      set({
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Ошибка добавления аксессуаров',
       });
     }
   },

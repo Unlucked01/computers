@@ -484,7 +484,7 @@ export default function PCModel({
       </div>
 
       {/* Информационная панель - перенесена ниже */}
-      <div className="mt-8 mx-6 bg-white rounded-2xl shadow-xl border p-4">
+      <div className="p-4 mb-4 bg-white rounded-2xl shadow-xl border p-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <div className="text-sm">

@@ -9,7 +9,6 @@ import { Component, ComponentCategory } from '../../types';
 
 export default function Configurator() {
   const [selectedCategory, setSelectedCategory] = useState<string>('cpu');
-  const [isModelExpanded, setIsModelExpanded] = useState(false);
   
   const {
     selectedComponents,
@@ -99,23 +98,18 @@ export default function Configurator() {
                 <h3 className="text-lg font-semibold text-gray-900">
                   Визуализация сборки
                 </h3>
-                <button
-                  onClick={() => setIsModelExpanded(!isModelExpanded)}
-                  className="btn-outline"
-                >
-                  {isModelExpanded ? 'Свернуть' : 'Развернуть'}
-                </button>
+                
               </div>
 
               <div className={`flex-1 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl ${
-                isModelExpanded ? 'fixed inset-0 z-50 p-8' : ''
+                false ? 'fixed inset-0 z-50 p-8' : ''
               }`}>
                 <PCModel
                   selectedComponents={selectedComponents}
                   selectedCategory={selectedCategory}
                   onComponentClick={setSelectedCategory}
-                  expanded={isModelExpanded}
-                  onClose={() => setIsModelExpanded(false)}
+                  expanded={false}
+                  onClose={() => {}}
                 />
               </div>
             </div>

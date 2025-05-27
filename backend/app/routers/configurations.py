@@ -6,10 +6,10 @@ import uuid
 from datetime import datetime
 from uuid import UUID
 from ..database import get_db
-from ..models import Configuration, ConfigurationItem, Component
+from ..models import Configuration, ConfigurationItem, ConfigurationAccessory, Component
 from ..schemas.configuration import (
     ConfigurationCreate, ConfigurationResponse, 
-    ConfigurationItemCreate, CompatibilityCheck,
+    ConfigurationItemCreate, ConfigurationAccessoryCreate, CompatibilityCheck,
     ConfigurationExport
 )
 from ..services.compatibility_service import CompatibilityService
@@ -45,7 +45,8 @@ async def get_configurations(
 ):
     """Получить список конфигураций"""
     configs = db.query(Configuration).options(
-        joinedload(Configuration.items).joinedload(ConfigurationItem.component)
+        joinedload(Configuration.items).joinedload(ConfigurationItem.component),
+        joinedload(Configuration.accessories).joinedload(ConfigurationAccessory.component)
     ).offset(skip).limit(limit).all()
     
     return configs
@@ -56,7 +57,9 @@ async def get_configuration(config_id: UUID, db: Session = Depends(get_db)):
     """Получить конфигурацию по ID"""
     config = db.query(Configuration).options(
         joinedload(Configuration.items).joinedload(ConfigurationItem.component).joinedload(Component.category),
-        joinedload(Configuration.items).joinedload(ConfigurationItem.component).joinedload(Component.stock)
+        joinedload(Configuration.items).joinedload(ConfigurationItem.component).joinedload(Component.stock),
+        joinedload(Configuration.accessories).joinedload(ConfigurationAccessory.component).joinedload(Component.category),
+        joinedload(Configuration.accessories).joinedload(ConfigurationAccessory.component).joinedload(Component.stock)
     ).filter(Configuration.id == config_id).first()
     
     if not config:
@@ -70,7 +73,9 @@ async def get_configuration_by_uuid(public_uuid: str, db: Session = Depends(get_
     """Получить конфигурацию по публичному UUID"""
     config = db.query(Configuration).options(
         joinedload(Configuration.items).joinedload(ConfigurationItem.component).joinedload(Component.category),
-        joinedload(Configuration.items).joinedload(ConfigurationItem.component).joinedload(Component.stock)
+        joinedload(Configuration.items).joinedload(ConfigurationItem.component).joinedload(Component.stock),
+        joinedload(Configuration.accessories).joinedload(ConfigurationAccessory.component).joinedload(Component.category),
+        joinedload(Configuration.accessories).joinedload(ConfigurationAccessory.component).joinedload(Component.stock)
     ).filter(Configuration.public_uuid == public_uuid).first()
     
     if not config:
@@ -145,6 +150,82 @@ async def add_component_to_configuration(
         return {"message": "Компонент добавлен в конфигурацию"}
 
 
+@router.post("/configurations/{config_id}/accessories")
+async def add_accessory_to_configuration(
+    config_id: UUID,
+    accessory_data: ConfigurationAccessoryCreate,
+    db: Session = Depends(get_db)
+):
+    """Добавить аксессуар в конфигурацию"""
+    
+    # Проверяем существование конфигурации
+    config = db.query(Configuration).filter(Configuration.id == config_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Конфигурация не найдена")
+    
+    # Проверяем существование компонента и что это аксессуар
+    component = db.query(Component).options(
+        joinedload(Component.category)
+    ).filter(Component.id == accessory_data.component_id).first()
+    
+    if not component:
+        raise HTTPException(status_code=404, detail="Компонент не найден")
+    
+    if component.category.slug != "accessories":
+        raise HTTPException(status_code=400, detail="Компонент не является аксессуаром")
+    
+    # Проверяем, нет ли уже такого аксессуара в конфигурации
+    existing_accessory = db.query(ConfigurationAccessory).filter(
+        ConfigurationAccessory.configuration_id == config_id,
+        ConfigurationAccessory.component_id == accessory_data.component_id
+    ).first()
+    
+    if existing_accessory:
+        # Обновляем количество
+        existing_accessory.quantity = accessory_data.quantity
+        existing_accessory.notes = accessory_data.notes
+        db.commit()
+        db.refresh(existing_accessory)
+        
+        return {"message": "Аксессуар обновлен в конфигурации"}
+    else:
+        # Создаем новый аксессуар
+        db_accessory = ConfigurationAccessory(
+            configuration_id=config_id,
+            component_id=accessory_data.component_id,
+            quantity=accessory_data.quantity,
+            notes=accessory_data.notes,
+            price_snapshot=component.price
+        )
+        
+        db.add(db_accessory)
+        db.commit()
+        
+        return {"message": "Аксессуар добавлен в конфигурацию"}
+
+
+@router.delete("/configurations/{config_id}/accessories/{accessory_id}")
+async def remove_accessory_from_configuration(
+    config_id: UUID,
+    accessory_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """Удалить аксессуар из конфигурации"""
+    
+    accessory = db.query(ConfigurationAccessory).filter(
+        ConfigurationAccessory.id == accessory_id,
+        ConfigurationAccessory.configuration_id == config_id
+    ).first()
+    
+    if not accessory:
+        raise HTTPException(status_code=404, detail="Аксессуар не найден в конфигурации")
+    
+    db.delete(accessory)
+    db.commit()
+    
+    return {"message": "Аксессуар удален из конфигурации"}
+
+
 @router.delete("/configurations/{config_id}/items/{item_id}")
 async def remove_component_from_configuration(
     config_id: UUID,
@@ -201,10 +282,12 @@ async def check_configuration_compatibility(config_id: UUID, db: Session = Depen
 async def export_configuration_pdf(config_id: UUID, db: Session = Depends(get_db)):
     """Экспортировать конфигурацию в PDF"""
     
-    # Получаем конфигурацию
+    # Получаем конфигурацию с аксессуарами
     config = db.query(Configuration).options(
         joinedload(Configuration.items).joinedload(ConfigurationItem.component).joinedload(Component.category),
-        joinedload(Configuration.items).joinedload(ConfigurationItem.component).joinedload(Component.stock)
+        joinedload(Configuration.items).joinedload(ConfigurationItem.component).joinedload(Component.stock),
+        joinedload(Configuration.accessories).joinedload(ConfigurationAccessory.component).joinedload(Component.category),
+        joinedload(Configuration.accessories).joinedload(ConfigurationAccessory.component).joinedload(Component.stock)
     ).filter(Configuration.id == config_id).first()
     
     if not config:
