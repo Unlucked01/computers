@@ -50,19 +50,19 @@ services:
       start_period: 40s
 
   # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   container_name: pc_configurator_frontend
-  #   environment:
-  #     NEXT_PUBLIC_API_URL: http://localhost:8000
-  #     NODE_ENV: development
-  #   ports:
-  #     - "3000:3000"
-  #   restart: unless-stopped
-  #   depends_on:
-  #     backend:
-  #       condition: service_healthy
+  build:
+    context: ./frontend
+    dockerfile: Dockerfile
+  container_name: pc_configurator_frontend
+  environment:
+    NEXT_PUBLIC_API_URL: http://localhost:8000
+    NODE_ENV: development
+  ports:
+    - "3000:3000"
+  restart: unless-stopped
+  depends_on:
+    backend:
+      condition: service_healthy
 
 volumes:
   pdf_temp:
