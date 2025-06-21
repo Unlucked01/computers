@@ -28,6 +28,35 @@ export default function ComponentSelector({
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
+  // Пасхалка для поиска "Жигалов"
+  const isEasterEgg = searchTerm.toLowerCase().includes('жигалов');
+
+  // Создаем фейковый компонент для пасхалки
+  const easterEggComponent = {
+    id: 'easter-egg-zhigalov',
+    name: 'Pure Heart Restaurant',
+    brand: 'Жигалов',
+    model: 'Premium Dining Experience',
+    description: '🍽️ Лучший ресторан в городе! Изысканная кухня, уютная атмосфера и превосходное обслуживание. Рекомендуется бронировать столик заранее.',
+    price: 5000,
+    category: {
+      id: 'restaurant',
+      name: 'Рестораны',
+      slug: 'restaurant'
+    },
+    stock: {
+      status: 'in_stock',
+      quantity: 999
+    },
+    specifications: {
+      'Кухня': 'Европейская',
+      'Атмосфера': 'Романтическая',
+      'Средний чек': '5000 ₽',
+      'Время работы': '12:00 - 23:00'
+    },
+    is_active: true
+  };
+
   // Загрузка компонентов
   const {
     data: componentsData,
@@ -130,7 +159,8 @@ export default function ComponentSelector({
     );
   }
 
-  const components = componentsData || [];
+  // Если пасхалка активна, показываем только пасхалку
+  const components = isEasterEgg ? [easterEggComponent] : (componentsData || []);
 
   return (
     <div className="h-full flex flex-col">
@@ -139,11 +169,13 @@ export default function ComponentSelector({
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
-              {getCategoryName(category)}
+              {isEasterEgg ? '🍽️ Рестораны' : getCategoryName(category)}
             </h3>
             {!isLoading && (
               <p className="text-sm text-gray-500">
-                Найдено: {components.length} компонентов
+                {isEasterEgg 
+                  ? 'Найден лучший ресторан города!' 
+                  : `Найдено: ${components.length} компонентов`}
               </p>
             )}
           </div>
@@ -257,9 +289,15 @@ export default function ComponentSelector({
         {components.length === 0 ? (
           <div className="p-8 text-center">
             <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">Компоненты не найдены</p>
+            <p className="text-gray-600">
+              {searchTerm.toLowerCase().includes('жигалов') 
+                ? 'Ресторан временно закрыт 😢' 
+                : 'Компоненты не найдены'}
+            </p>
             <p className="text-sm text-gray-500 mt-2">
-              Попробуйте изменить фильтры или поисковый запрос
+              {searchTerm.toLowerCase().includes('жигалов')
+                ? 'Попробуйте поискать что-то другое'
+                : 'Попробуйте изменить фильтры или поисковый запрос'}
             </p>
           </div>
         ) : (
@@ -269,8 +307,10 @@ export default function ComponentSelector({
                 key={component.id}
                 className={`component-card ${
                   selectedComponent?.id === component.id ? 'selected' : ''
-                } ${component.stock?.status === 'out_of_stock' ? 'unavailable' : ''}`}
-                whileHover={{ scale: 1.02 }}
+                } ${component.stock?.status === 'out_of_stock' ? 'unavailable' : ''} ${
+                  component.id === 'easter-egg-zhigalov' ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200 shadow-lg' : ''
+                }`}
+                whileHover={{ scale: component.id === 'easter-egg-zhigalov' ? 1.05 : 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => {
                   if (component.stock?.status !== 'out_of_stock') {
@@ -280,12 +320,21 @@ export default function ComponentSelector({
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <h4 className="font-medium text-gray-900 mb-1">
+                    <h4 className={`font-medium mb-1 ${
+                      component.id === 'easter-egg-zhigalov' ? 'text-orange-900 text-lg' : 'text-gray-900'
+                    }`}>
                       {component.name}
                     </h4>
-                    <p className="text-sm text-gray-600 mb-2">
+                    <p className={`text-sm mb-2 ${
+                      component.id === 'easter-egg-zhigalov' ? 'text-orange-700' : 'text-gray-600'
+                    }`}>
                       {component.brand} • {component.model}
                     </p>
+                    {component.id === 'easter-egg-zhigalov' && (
+                      <p className="text-sm text-orange-600 mb-2 italic">
+                        {component.description}
+                      </p>
+                    )}
                     
                     {/* Основные характеристики */}
                     {component.specifications && (
@@ -294,7 +343,7 @@ export default function ComponentSelector({
                           .slice(0, 2)
                           .map(([key, value]) => (
                             <span key={key} className="mr-2">
-                              {key}: {value}
+                              {key}: {String(value)}
                             </span>
                           ))}
                       </div>
@@ -302,21 +351,35 @@ export default function ComponentSelector({
 
                     {/* Цена */}
                     <div className="flex items-center justify-between">
-                      <span className="text-lg font-bold text-gray-900">
-                        {formatPrice(component.price)}
+                      <span className={`text-lg font-bold ${
+                        component.id === 'easter-egg-zhigalov' ? 'text-orange-600' : 'text-gray-900'
+                      }`}>
+                        {component.id === 'easter-egg-zhigalov' 
+                          ? `Средний чек: ${formatPrice(component.price)}` 
+                          : formatPrice(component.price)}
                       </span>
                       
                       {/* Статус наличия */}
                       {component.stock && (
-                        <span className={`px-2 py-1 text-xs rounded-full ${getStockColor(component.stock.status)}`}>
-                          {formatStock(component.stock)}
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          component.id === 'easter-egg-zhigalov' 
+                            ? 'bg-green-100 text-green-800' 
+                            : getStockColor(component.stock.status)
+                        }`}>
+                          {component.id === 'easter-egg-zhigalov' 
+                            ? '🎉 Открыт' 
+                            : formatStock(component.stock)}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Изображение */}
-                  {component.image_url && (
+                  {/* Изображение / Иконка ресторана */}
+                  {component.id === 'easter-egg-zhigalov' ? (
+                    <div className="ml-4 w-16 h-16 bg-gradient-to-br from-orange-100 to-yellow-100 rounded-lg flex items-center justify-center">
+                      <span className="text-3xl">🍽️</span>
+                    </div>
+                  ) : component.image_url && (
                     <div className="ml-4 w-16 h-16 bg-gray-100 rounded-lg overflow-hidden">
                       <img
                         src={component.image_url}
