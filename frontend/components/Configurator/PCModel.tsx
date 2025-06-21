@@ -490,7 +490,7 @@ export default function PCModel({
             <div className="text-sm">
               <span className="text-gray-600">Компонентов:</span>
               <span className="font-bold text-gray-900 ml-2">
-                {Object.keys(selectedComponents).length}/7
+                {Object.keys(selectedComponents).length}/8
               </span>
             </div>
             <div className="w-px h-6 bg-gray-300"></div>

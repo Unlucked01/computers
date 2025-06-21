@@ -239,7 +239,7 @@ export default function About() {
                   Архитектура приложения
                 </h2>
                 <p className="text-xl text-gray-600">
-                  Современная микросервисная архитектура с разделением frontend и backend
+                  Современная клиент-серверная архитектура с разделением frontend и backend
                 </p>
               </div>
 

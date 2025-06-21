@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Upload, FileText, AlertCircle, CheckCircle, ArrowRight } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useRouter } from 'next/router';
+import { useConfiguratorStore } from '../hooks/useConfiguratorStore';
 
 export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -11,6 +12,7 @@ export default function ImportPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [importedConfig, setImportedConfig] = useState<any>(null);
   const router = useRouter();
+  const { loadImportedConfiguration } = useConfiguratorStore();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -52,25 +54,43 @@ export default function ImportPage() {
     setUploadStatus('idle');
 
     try {
-      // Имитация импорта (в реальности здесь был бы API вызов)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Создаем FormData для отправки файла
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Отправляем файл на сервер
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/configurations/import-pdf`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Ошибка импорта');
+      }
+
+      const importedData = await response.json();
       
-      // Имитация успешного импорта
-      const mockConfig = {
-        name: 'Импортированная конфигурация',
-        components: [
-          { category: 'Процессор', name: 'Intel Core i7-13700K', price: 35990 },
-          { category: 'Материнская плата', name: 'ASUS ROG STRIX Z790-E', price: 28990 },
-          { category: 'Оперативная память', name: 'Corsair Vengeance LPX 32GB', price: 12990 },
-          { category: 'Видеокарта', name: 'NVIDIA RTX 4070 Ti', price: 89990 },
-        ],
-        totalPrice: 167960
+      // Преобразуем данные в нужный формат
+      const configData = {
+        name: importedData.name,
+        components: importedData.components.map((comp: any) => ({
+          id: comp.id,
+          category: comp.category,
+          name: comp.name,
+          brand: comp.brand,
+          price: comp.price,
+          not_found: comp.not_found || false
+        })),
+        totalPrice: importedData.total_price,
+        compatibility_status: importedData.compatibility_status
       };
       
-      setImportedConfig(mockConfig);
+      setImportedConfig(configData);
       setUploadStatus('success');
     } catch (error) {
-      setErrorMessage('Ошибка при импорте конфигурации. Проверьте формат файла.');
+      console.error('Ошибка импорта:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Ошибка при импорте конфигурации. Проверьте формат файла.');
       setUploadStatus('error');
     } finally {
       setIsUploading(false);
@@ -78,6 +98,10 @@ export default function ImportPage() {
   };
 
   const handleUseConfiguration = () => {
+    // Загружаем импортированную конфигурацию в store
+    if (importedConfig) {
+      loadImportedConfiguration(importedConfig);
+    }
     // Перенаправляем на главную страницу с импортированной конфигурацией
     router.push('/');
   };
@@ -120,6 +144,7 @@ export default function ImportPage() {
                         : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
                     }`}
                   >
+                    {/* Скрытый input для выбора файлов */}
                     <input
                       type="file"
                       accept=".pdf"
@@ -128,30 +153,32 @@ export default function ImportPage() {
                       id="file-upload"
                     />
                     
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      <div className="flex flex-col items-center space-y-4">
-                        {uploadStatus === 'error' ? (
-                          <AlertCircle className="w-16 h-16 text-red-500" />
-                        ) : (
-                          <Upload className="w-16 h-16 text-gray-400" />
-                        )}
-                        
-                        <div>
-                          <p className="text-lg font-medium text-gray-900 mb-2">
-                            {file ? file.name : 'Выберите PDF файл или перетащите сюда'}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            Поддерживаются только PDF файлы конфигураций
-                          </p>
-                        </div>
-                        
-                        {!file && (
-                          <button className="btn-primary">
+                    <div className="flex flex-col items-center space-y-4">
+                      {uploadStatus === 'error' ? (
+                        <AlertCircle className="w-16 h-16 text-red-500" />
+                      ) : (
+                        <Upload className="w-16 h-16 text-gray-400" />
+                      )}
+                      
+                      <div>
+                        <p className="text-lg font-medium text-gray-900 mb-2">
+                          {file ? file.name : 'Перетащите PDF файл сюда или выберите файл'}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Поддерживаются только PDF файлы конфигураций
+                        </p>
+                      </div>
+                                              
+                      {!file && (
+                          <button 
+                            onClick={() => document.getElementById('file-upload')?.click()}
+                            className="btn-primary"
+                          >
                             Выбрать файл
                           </button>
                         )}
-                      </div>
-                    </label>
+
+                    </div>
                   </div>
 
                   {/* Сообщение об ошибке */}
@@ -214,10 +241,19 @@ export default function ImportPage() {
                       </h4>
                       <div className="space-y-2">
                         {importedConfig.components.map((component: any, index: number) => (
-                          <div key={index} className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">
-                              {component.category}: {component.name}
-                            </span>
+                          <div key={index} className={`flex justify-between items-center p-2 rounded ${
+                            component.not_found ? 'bg-yellow-50 border border-yellow-200' : ''
+                          }`}>
+                            <div className="flex-1">
+                              <span className="text-sm text-gray-600">
+                                {component.category}: {component.brand} {component.name}
+                              </span>
+                              {component.not_found && (
+                                <div className="text-xs text-yellow-600 mt-1">
+                                  ⚠️ Компонент не найден в базе данных
+                                </div>
+                              )}
+                            </div>
                             <span className="text-sm font-medium">
                               {component.price.toLocaleString()} ₽
                             </span>

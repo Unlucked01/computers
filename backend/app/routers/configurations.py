@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import List
@@ -14,6 +14,7 @@ from ..schemas.configuration import (
 )
 from ..services.compatibility_service import CompatibilityService
 from ..services.pdf_service import PDFService
+from ..services.pdf_import_service import PDFImportService
 
 router = APIRouter()
 
@@ -366,6 +367,33 @@ async def delete_configuration(config_id: UUID, db: Session = Depends(get_db)):
     db.commit()
     
     return {"message": "Конфигурация удалена"}
+
+
+@router.post("/configurations/import-pdf")
+async def import_configuration_from_pdf(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Импортировать конфигурацию из PDF файла"""
+    
+    # Проверяем тип файла
+    if not file.content_type == "application/pdf":
+        raise HTTPException(status_code=400, detail="Файл должен быть в формате PDF")
+    
+    try:
+        # Читаем содержимое файла
+        pdf_content = await file.read()
+        
+        # Создаем сервис импорта
+        import_service = PDFImportService(db)
+        
+        # Импортируем конфигурацию
+        config_data = await import_service.import_configuration_from_pdf(pdf_content)
+        
+        return config_data
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 async def _update_configuration_totals(config_id: UUID, db: Session):

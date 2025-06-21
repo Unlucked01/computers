@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { CreditCard, Shield, CheckCircle, ArrowLeft, Package, Truck } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useRouter } from 'next/router';
+import { useConfiguratorStore } from '../hooks/useConfiguratorStore';
 
 export default function PaymentPage() {
   const [step, setStep] = useState<'form' | 'processing' | 'success'>('form');
@@ -16,18 +17,33 @@ export default function PaymentPage() {
     address: '',
   });
   const router = useRouter();
+  const { selectedComponents } = useConfiguratorStore();
 
-  // Имитация данных заказа
+  // Получаем данные заказа из store
+  const componentList = Object.values(selectedComponents);
+  const subtotal = componentList.reduce((sum, component) => sum + component.price, 0);
+  
+  // Логика расчета доставки
+  const FREE_DELIVERY_THRESHOLD = 150000; // 150,000 рублей
+  const DELIVERY_COST = 1500;
+  const deliveryCost = subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_COST;
+  const grandTotal = subtotal + deliveryCost;
+
+  // Если нет компонентов, перенаправляем на главную
+  useEffect(() => {
+    if (componentList.length === 0) {
+      router.push('/');
+    }
+  }, [componentList.length, router]);
+
   const orderData = {
-    items: [
-      { name: 'Intel Core i7-13700K', price: 35990 },
-      { name: 'ASUS ROG STRIX Z790-E', price: 28990 },
-      { name: 'Corsair Vengeance LPX 32GB', price: 12990 },
-      { name: 'NVIDIA RTX 4070 Ti', price: 89990 },
-    ],
-    total: 167960,
-    delivery: 1500,
-    grandTotal: 169460
+    items: componentList.map(component => ({
+      name: `${component.brand} ${component.name}`,
+      price: component.price
+    })),
+    total: subtotal,
+    delivery: deliveryCost,
+    grandTotal: grandTotal
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -255,7 +271,9 @@ export default function PaymentPage() {
                       
                       <div className="flex justify-between items-center py-2">
                         <span className="text-gray-700">Доставка</span>
-                        <span className="font-medium">{orderData.delivery.toLocaleString()} ₽</span>
+                        <span className="font-medium">
+                          {orderData.delivery === 0 ? 'Бесплатно' : `${orderData.delivery.toLocaleString()} ₽`}
+                        </span>
                       </div>
                       
                       <div className="flex justify-between items-center py-3 border-t-2 text-lg font-bold">
@@ -265,15 +283,32 @@ export default function PaymentPage() {
                     </div>
 
                     {/* Информация о доставке */}
-                    <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                    <div className={`mt-6 p-4 rounded-lg ${
+                      orderData.delivery === 0 ? 'bg-green-50' : 'bg-blue-50'
+                    }`}>
                       <div className="flex items-center space-x-2 mb-2">
-                        <Truck className="w-5 h-5 text-blue-600" />
-                        <span className="font-medium text-blue-900">Доставка</span>
+                        <Truck className={`w-5 h-5 ${
+                          orderData.delivery === 0 ? 'text-green-600' : 'text-blue-600'
+                        }`} />
+                        <span className={`font-medium ${
+                          orderData.delivery === 0 ? 'text-green-900' : 'text-blue-900'
+                        }`}>
+                          {orderData.delivery === 0 ? 'Бесплатная доставка!' : 'Доставка'}
+                        </span>
                       </div>
-                      <p className="text-sm text-blue-700">
-                        Бесплатная доставка при заказе от 150 000 ₽
-                      </p>
-                      <p className="text-sm text-blue-700">
+                      {orderData.delivery === 0 ? (
+                        <p className="text-sm text-green-700">
+                          🎉 Поздравляем! Ваш заказ превышает 150 000 ₽ - доставка бесплатно!
+                        </p>
+                      ) : (
+                        <p className="text-sm text-blue-700">
+                          Бесплатная доставка при заказе от 150 000 ₽ 
+                          (до бесплатной доставки осталось: {(FREE_DELIVERY_THRESHOLD - subtotal).toLocaleString()} ₽)
+                        </p>
+                      )}
+                      <p className={`text-sm ${
+                        orderData.delivery === 0 ? 'text-green-700' : 'text-blue-700'
+                      }`}>
                         Срок доставки: 2-3 рабочих дня
                       </p>
                     </div>

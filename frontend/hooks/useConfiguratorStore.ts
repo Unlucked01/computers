@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import { Component, Configuration, ConfiguratorState, CompatibilityCheck } from '../types';
-import { checkCompatibilityAPI, configurationsApi } from '../lib/api';
+import { checkCompatibilityAPI, configurationsApi, componentsApi } from '../lib/api';
 
 interface ConfiguratorStore extends ConfiguratorState {
   // Actions
   addComponent: (component: Component) => void;
   removeComponent: (categorySlug: string) => void;
   clearConfiguration: () => void;
+  loadImportedConfiguration: (importedConfig: any) => void;
   checkCompatibility: () => Promise<void>;
   saveConfiguration: (name: string, description?: string) => Promise<void>;
   addAccessoriesToConfiguration: (accessories: Array<{component: Component, quantity: number}>) => Promise<void>;
@@ -53,6 +54,60 @@ export const useConfiguratorStore = create<ConfiguratorStore>((set, get) => ({
       currentConfiguration: undefined,
       error: undefined,
     });
+  },
+
+  loadImportedConfiguration: (importedConfig: any) => {
+    // Загружаем реальные компоненты из API по их ID
+    const loadComponents = async () => {
+      if (!importedConfig.components) return;
+      
+      const selectedComponents: Record<string, Component> = {};
+      
+      // Маппинг категорий на правильные slug'и
+      const categoryMapping: Record<string, string> = {
+        'Процессор': 'cpu',
+        'Материнская плата': 'motherboard',
+        'Оперативная память': 'ram',
+        'Видеокарта': 'gpu',
+        'Накопитель': 'storage',
+        'Блок питания': 'psu',
+        'Корпус': 'case',
+        'Охлаждение': 'cooler',
+      };
+      
+      try {
+        set({ isLoading: true });
+        
+                 // Загружаем каждый компонент по ID
+         for (const comp of importedConfig.components) {
+            if (comp.id && !comp.not_found) {
+             try {
+               const component = await componentsApi.getById(comp.id);
+               const categorySlug = categoryMapping[component.category.name] || component.category.slug;
+               selectedComponents[categorySlug] = component;
+             } catch (error) {
+               console.error(`Ошибка загрузки компонента ${comp.id}:`, error);
+             }
+           } else if (comp.not_found) {
+             // Для компонентов, не найденных в базе, показываем предупреждение
+             console.warn(`Компонент не найден в базе данных: ${comp.brand} ${comp.name}`);
+           }
+         }
+        
+        set({
+          selectedComponents,
+          isLoading: false,
+          error: undefined,
+        });
+      } catch (error) {
+        set({
+          isLoading: false,
+          error: error instanceof Error ? error.message : 'Ошибка загрузки компонентов',
+        });
+      }
+    };
+    
+    loadComponents();
   },
 
   checkCompatibility: async () => {

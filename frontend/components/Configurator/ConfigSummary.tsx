@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Download, Save, Share2, ShoppingCart, Calculator, Package } from 'lucide-react';
+import { Download, Save, ShoppingCart, Calculator, Package } from 'lucide-react';
 import { Component, Configuration } from '../../types';
 import { formatPrice } from '../../lib/api';
 import { useConfiguratorStore } from '../../hooks/useConfiguratorStore';
@@ -76,13 +76,7 @@ export default function ConfigSummary({ selectedComponents, configuration }: Con
     }
   };
 
-  const handleShare = () => {
-    if (configuration?.public_uuid) {
-      const shareUrl = `${window.location.origin}/config/${configuration.public_uuid}`;
-      navigator.clipboard.writeText(shareUrl);
-      // Можно добавить уведомление о копировании
-    }
-  };
+
 
   const isConfigurationSaved = configuration?.id && configuration.id !== '0';
 
@@ -147,7 +141,7 @@ export default function ConfigSummary({ selectedComponents, configuration }: Con
           >
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-900">
-                {getCategoryName(component.category.slug)}
+                {component.category.name}
               </p>
               <p className="text-xs text-gray-600 truncate">
                 {component.brand} {component.name}
@@ -191,23 +185,14 @@ export default function ConfigSummary({ selectedComponents, configuration }: Con
         </button>
 
         {/* Дополнительные действия */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex justify-center">
           <button
             onClick={handleExportPDF}
             disabled={!isConfigurationSaved || isExporting}
-            className="btn-outline flex items-center justify-center space-x-2"
+            className="btn-outline flex items-center justify-center space-x-2 w-full"
           >
             <Download className="w-4 h-4" />
-            <span>{isExporting ? 'Экспорт...' : 'PDF'}</span>
-          </button>
-
-          <button
-            onClick={handleShare}
-            disabled={!isConfigurationSaved}
-            className="btn-outline flex items-center justify-center space-x-2"
-          >
-            <Share2 className="w-4 h-4" />
-            <span>Поделиться</span>
+            <span>{isExporting ? 'Экспорт...' : 'Экспорт в PDF'}</span>
           </button>
         </div>
 

@@ -366,13 +366,7 @@ export default function Accessories() {
                           <div className="text-xl font-bold text-blue-600">
                             {accessory.price.toLocaleString()} ₽
                           </div>
-                          <button 
-                            className="btn-secondary text-sm"
-                            disabled={accessory.stock?.status === 'out_of_stock'}
-                          >
-                            <ShoppingCart className="w-4 h-4 mr-1" />
-                            {accessory.stock?.status === 'out_of_stock' ? 'Нет в наличии' : 'В корзину'}
-                          </button>
+
                         </div>
                       </div>
                     );
